@@ -1,5 +1,0 @@
-# Python 3.11 recommended. Install: pip install -r requirements.txt
-streamlit==1.50.0
-qrcode[pil]==8.2
-# Optional persistent PostgreSQL storage (Neon / Supabase / managed PostgreSQL).
-psycopg[binary]>=3.2.3,<4.0
