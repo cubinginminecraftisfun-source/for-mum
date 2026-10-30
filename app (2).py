@@ -70,7 +70,7 @@ ss = st.session_state
 # ───────────────────────── 상태 저장 / 복원 (URL ?d=...) ─────────────────────────
 def encode_state() -> str:
     obj = {
-        "i": [[x["cat"], x["name"], x["imp"], x["limit"], int(x["skip"])] for x in ss.items],
+        "i": [[x["cat"], x["name"], x["imp"], x["limit"], int(x["skip"])] for x in ss.memo],
         "c": [[x["cat"], x["name"], x["imp"], x["limit"], x["price"], x["qty"]] for x in ss.cart],
     }
     raw = json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -90,7 +90,7 @@ def load_from_url():
         raw = zlib.decompress(base64.urlsafe_b64decode(d + "=" * (-len(d) % 4)))
         obj = json.loads(raw.decode("utf-8"))
         for cat, name, imp, limit, skip in obj.get("i", []):
-            ss.items.append(
+            ss.memo.append(
                 {"id": new_id(), "cat": cat, "name": name, "imp": imp, "limit": limit, "skip": bool(skip)}
             )
         for cat, name, imp, limit, price, qty in obj.get("c", []):
@@ -101,8 +101,8 @@ def load_from_url():
         pass  # 잘못된 링크면 빈 상태로 시작
 
 
-if "items" not in ss:
-    ss.items, ss.cart, ss.nid = [], [], 0
+if "memo" not in ss:
+    ss.memo, ss.cart, ss.nid = [], [], 0
     load_from_url()
 
 
@@ -128,7 +128,7 @@ def add_item():
     name = (ss.get("f_name") or "").strip()
     if not name:
         return
-    ss.items.append(
+    ss.memo.append(
         {
             "id": new_id(),
             "cat": CATS.index(ss.f_cat),
@@ -144,7 +144,7 @@ def add_item():
 
 @st.dialog("🛒 카트에 담기")
 def buy_dialog(iid: int):
-    it = next((x for x in ss.items if x["id"] == iid), None)
+    it = next((x for x in ss.memo if x["id"] == iid), None)
     if it is None:
         st.rerun()
     icon, label, hint = IMP[it["imp"]]
@@ -170,7 +170,7 @@ def buy_dialog(iid: int):
 
     b1, b2 = st.columns(2)
     if b1.button("🛒 담기", type="primary", disabled=price <= 0, use_container_width=True):
-        ss.items = [x for x in ss.items if x["id"] != iid]
+        ss.memo = [x for x in ss.memo if x["id"] != iid]
         ss.cart.append(
             {
                 "id": new_id(),
@@ -190,7 +190,7 @@ def buy_dialog(iid: int):
 
 
 # ───────────────────────── 화면 ─────────────────────────
-pending = [x for x in ss.items if not x["skip"]]
+pending = [x for x in ss.memo if not x["skip"]]
 cart_total = sum(x["price"] * x["qty"] for x in ss.cart)
 
 st.markdown(
@@ -259,14 +259,14 @@ with t2.popover("📱"):
     else:
         st.caption("배포된 앱 주소를 넣으면 QR이 만들어져요.")
     if st.button("🗑 전체 초기화", use_container_width=True):
-        ss.items, ss.cart = [], []
+        ss.memo, ss.cart = [], []
         st.query_params.clear()
         st.rerun()
 
 # 목록 영역 (내부 스크롤만 허용 → 페이지 스크롤 없음)
 with st.container(height=255, border=False):
     if view == "memo":
-        rows = sorted(ss.items, key=lambda x: (x["skip"], x["imp"], x["id"]))
+        rows = sorted(ss.memo, key=lambda x: (x["skip"], x["imp"], x["id"]))
         if not rows:
             st.caption("메모가 비었어요. 위에서 추가해 보세요 ✍️")
         for it in rows:
@@ -280,7 +280,7 @@ with st.container(height=255, border=False):
             if c2.button("🛒", key=f"b{it['id']}"):
                 buy_dialog(it["id"])
             if c3.button("✕", key=f"d{it['id']}"):
-                ss.items = [x for x in ss.items if x["id"] != it["id"]]
+                ss.memo = [x for x in ss.memo if x["id"] != it["id"]]
                 st.rerun()
     else:
         if not ss.cart:
@@ -294,7 +294,7 @@ with st.container(height=255, border=False):
             )
             if c2.button("↩", key=f"u{it['id']}", help="메모로 되돌리기"):
                 ss.cart = [x for x in ss.cart if x["id"] != it["id"]]
-                ss.items.append(
+                ss.memo.append(
                     {
                         "id": new_id(),
                         "cat": it["cat"],
